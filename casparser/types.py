@@ -1,19 +1,21 @@
 from datetime import date
 from decimal import Decimal
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from attrs import define, field, frozen
+from attrs.converters import optional
 
 from .enums import CASFileType, FileType, TransactionType
 
 
-class StatementPeriod(BaseModel):
-    from_: str = Field(alias="from")
+@frozen
+class StatementPeriod:
+    from_: str
     to: str
-    model_config = ConfigDict(populate_by_name=True)
 
 
-class InvestorInfo(BaseModel):
+@frozen
+class InvestorInfo:
     """Investor Info data structure."""
 
     name: str
@@ -22,7 +24,8 @@ class InvestorInfo(BaseModel):
     mobile: str
 
 
-class TransactionData(BaseModel):
+@define(kw_only=True)
+class TransactionData:
     """Mutual fund scheme transaction."""
 
     date: Union[date, str]
@@ -40,7 +43,8 @@ class TransactionData(BaseModel):
     gift_folio: Optional[str] = None
 
 
-class SchemeValuation(BaseModel):
+@define(kw_only=True)
+class SchemeValuation:
     """Scheme valuation as of a given date."""
 
     date: Union[date, str]
@@ -49,7 +53,8 @@ class SchemeValuation(BaseModel):
     value: Union[Decimal, float]
 
 
-class Scheme(BaseModel):
+@define(kw_only=True)
+class Scheme:
     """Mutual Fund Scheme data structure."""
 
     scheme: str
@@ -59,7 +64,7 @@ class Scheme(BaseModel):
     type: Optional[str] = None
     isin: Optional[str] = None
     amfi: Optional[str] = None
-    nominees: List[str] = []
+    nominees: List[str] = field(default_factory=list)
     open: Union[Decimal, float]
     close: Union[Decimal, float]
     close_calculated: Union[Decimal, float]
@@ -67,7 +72,8 @@ class Scheme(BaseModel):
     transactions: List[TransactionData]
 
 
-class Folio(BaseModel):
+@frozen(kw_only=True)
+class Folio:
     """Mutual Fund Folio data structure."""
 
     folio: str
@@ -78,7 +84,8 @@ class Folio(BaseModel):
     schemes: List[Scheme]
 
 
-class CASData(BaseModel):
+@frozen(kw_only=True)
+class CASData:
     """CAS Parser return data type."""
 
     statement_period: StatementPeriod
@@ -92,24 +99,34 @@ class CASData(BaseModel):
     # column (the statement's own checksum). A non-empty list means a
     # transaction row was likely dropped or mis-parsed — the parse still
     # returns, but the data for that scheme should not be trusted blindly.
-    parse_warnings: List[str] = []
-    model_config = ConfigDict(
-        populate_by_name=True,
-        use_enum_values=True,
-    )
+    parse_warnings: List[str] = field(default_factory=list)
 
 
-class DematOwner(BaseModel):
+@frozen
+class DematOwner:
     name: str
     PAN: str
 
 
-class Equity(BaseModel):
+def convert_to_decimal(value: Any) -> Decimal:
+    """Convert a value to Decimal, handling int, float, and str types."""
+    if isinstance(value, Decimal):
+        return value
+    elif isinstance(value, (int, float)):
+        return Decimal(str(value))
+    elif isinstance(value, str):
+        return Decimal(value.replace(",", ""))
+    else:
+        raise ValueError(f"Cannot convert {value} of type {type(value)} to Decimal")
+
+
+@define(kw_only=True)
+class Equity:
     name: Optional[str] = None
     isin: str
-    num_shares: Decimal
-    price: Decimal
-    value: Decimal
+    num_shares: Decimal = field(converter=convert_to_decimal)
+    price: Decimal = field(converter=convert_to_decimal)
+    value: Decimal = field(converter=convert_to_decimal)
     # Depository (NSDL/CDSL) statements identify an equity holding only by
     # ISIN. The exchange trading symbol (and exchange) are backfilled from the
     # ISIN database after parsing (see parsers._isin.batch_equity_symbols) so
@@ -117,22 +134,9 @@ class Equity(BaseModel):
     symbol: Optional[str] = None
     exchange: Optional[str] = None
 
-    @model_validator(mode="before")
-    @classmethod
-    def fix_float(cls, data: dict):
-        for k, v in data.items():
-            try:
-                if issubclass(Decimal, cls.__annotations__[k]) and isinstance(v, str):
-                    data[k] = v.replace(",", "_").replace("_", "")
-            except TypeError:
-                # Optional[...] / Union annotations (name / symbol / exchange)
-                # aren't classes; only the required Decimal fields need the
-                # comma-stripping treatment.
-                pass
-        return data
 
-
-class Bond(BaseModel):
+@define(kw_only=True)
+class Bond:
     """Corporate / government bond holding.
 
     Two source layouts feed this model — both are present in the same
@@ -149,31 +153,23 @@ class Bond(BaseModel):
 
     name: Optional[str] = None
     isin: str
-    num_bonds: Decimal
-    value: Decimal
-    face_value: Optional[Decimal] = None
-    coupon_rate: Optional[Decimal] = None
+    num_bonds: Decimal = field(converter=convert_to_decimal)
+    value: Decimal = field(converter=convert_to_decimal)
+    face_value: Optional[Decimal] = field(
+        converter=optional(convert_to_decimal), default=None
+    )
+    coupon_rate: Optional[Decimal] = field(
+        converter=optional(convert_to_decimal), default=None
+    )
     coupon_frequency: Optional[str] = None
     maturity_date: Optional[str] = None
-    market_price: Optional[Decimal] = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def fix_float(cls, data: dict):
-        for k, v in data.items():
-            try:
-                if issubclass(Decimal, cls.__annotations__[k]) and isinstance(v, str):
-                    data[k] = v.replace(",", "_").replace("_", "")
-            except TypeError:
-                # Optional[Decimal] / Union annotations land here; the
-                # parser already strips commas before constructing the
-                # model, so this is just a safety-net for required
-                # Decimal fields.
-                pass
-        return data
+    market_price: Optional[Decimal] = field(
+        converter=optional(convert_to_decimal), default=None
+    )
 
 
-class MutualFund(BaseModel):
+@define(kw_only=True)
+class MutualFund:
     name: Optional[str] = None
     isin: str
     # Depository (NSDL/CDSL) statements identify an MF holding only by
@@ -183,65 +179,40 @@ class MutualFund(BaseModel):
     # lines up with the same scheme from an RTA CAS on `amfi` / `type`.
     amfi: Optional[str] = None
     type: Optional[str] = None
-    balance: Decimal
-    nav: Decimal
-    value: Decimal
-    avg_cost: Optional[Decimal] = None
-    total_cost: Optional[Decimal] = None
+    balance: Decimal = field(converter=convert_to_decimal)
+    nav: Decimal = field(converter=convert_to_decimal)
+    value: Decimal = field(converter=convert_to_decimal)
+    avg_cost: Optional[Decimal] = field(
+        converter=optional(convert_to_decimal), default=None
+    )
+    total_cost: Optional[Decimal] = field(
+        converter=optional(convert_to_decimal), default=None
+    )
     ucc: Optional[str] = None
     folio: Optional[str] = None
-    pnl: Optional[Decimal] = None
-    return_: Optional[Decimal] = Field(None, alias="return")
-
-    @model_validator(mode="before")
-    @classmethod
-    def fix_float(cls, data: dict):
-        # Build a lookup from both attribute names and field aliases so that
-        # aliased fields (e.g. ``return`` -> ``return_``) also get the
-        # comma-stripping treatment.
-        annotations_by_key: dict = {}
-        for attr, annotation in cls.__annotations__.items():
-            annotations_by_key[attr] = annotation
-            field = cls.model_fields.get(attr)
-            if field is not None and field.alias is not None:
-                annotations_by_key[field.alias] = annotation
-        for k, v in data.items():
-            annotation = annotations_by_key.get(k)
-            if annotation is not None and issubclass(Decimal, annotation) and isinstance(v, str):
-                data[k] = v.replace(",", "_").replace("_", "")
-        return data
+    pnl: Optional[Decimal] = field(converter=optional(convert_to_decimal), default=None)
+    return_: Optional[Decimal] = field(
+        converter=optional(convert_to_decimal), default=None
+    )
 
 
-class DematAccount(BaseModel):
+@define(kw_only=True)
+class DematAccount:
     name: str
     type: str
     dp_id: Optional[str] = ""
     client_id: Optional[str] = ""
     folios: int
-    balance: Decimal
+    balance: Decimal = field(converter=convert_to_decimal)
     owners: List[DematOwner]
     equities: List[Equity]
     mutual_funds: List[MutualFund]
-    bonds: List[Bond] = []
-
-    @model_validator(mode="before")
-    @classmethod
-    def fix_float(cls, data: dict):
-        for k, v in data.items():
-            try:
-                if issubclass(Decimal, cls.__annotations__[k]) and isinstance(v, str):
-                    data[k] = v.replace(",", "_")
-            except TypeError:
-                pass
-        return data
+    bonds: List[Bond] = field(default_factory=list)
 
 
-class NSDLCASData(BaseModel):
+@define(kw_only=True)
+class NSDLCASData:
     accounts: List[DematAccount]
     statement_period: StatementPeriod
     investor_info: InvestorInfo
     file_type: FileType
-    model_config = ConfigDict(
-        populate_by_name=True,
-        use_enum_values=True,
-    )

@@ -203,7 +203,7 @@ def parse_nsdl(
     # holdings parser needs and the investor info from the same pages.
     atoms = pageobj.extract_atoms(pdf_path, password, _doc=_doc)
     blocks = pageobj.blocks_from_atoms(atoms)
-    period = _find_period(blocks) or StatementPeriod(**{"from": "", "to": ""})
+    period = _find_period(blocks) or StatementPeriod(from_="", to="")
 
     # Phase 1: bootstrap accounts from page-2 summary table.
     accounts_by_key: Dict[Tuple[str, str, str], DematAccount] = {}
@@ -596,7 +596,7 @@ def _find_period(blocks: List[Block]) -> Optional[StatementPeriod]:
     for b in blocks:
         m = PERIOD_RE.search(b.text())
         if m:
-            return StatementPeriod(**{"from": m.group(1), "to": m.group(2)})
+            return StatementPeriod(from_=m.group(1), to=m.group(2))
     return None
 
 
@@ -759,7 +759,7 @@ def _parse_mf_holdings_row(block: Block) -> Optional[MutualFund]:
         ucc=ucc,
         folio=folio,
         pnl=pnl,
-        **{"return": ret},
+        return_=ret,
     )
 
 

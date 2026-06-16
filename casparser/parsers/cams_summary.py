@@ -453,7 +453,7 @@ def parse(
         statement_period=(
             StatementPeriod(from_=statement_date, to=statement_date)
             if statement_date
-            else StatementPeriod(**{"from": "", "to": ""})
+            else StatementPeriod(from_="", to="")
         ),
         folios=list(folios.values()),
         investor_info=extract_cams_kfin_investor(pdf_path, password, _doc=_doc),

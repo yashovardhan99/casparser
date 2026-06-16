@@ -17,6 +17,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from cattrs.preconf.json import make_converter
+
 from casparser.types import CASData, NSDLCASData
 
 SCHEMA_DIR = Path(__file__).resolve().parent.parent / "schema"
@@ -41,6 +43,7 @@ def build_schemas() -> dict[str, dict]:
     precision-preserving JSON strings.
     """
     out: dict[str, dict] = {}
+    converter = make_converter()
     for stem, model in MODELS.items():
         schema = model.model_json_schema(by_alias=True, mode="serialization")
         out[stem] = {"$schema": DIALECT, **schema}

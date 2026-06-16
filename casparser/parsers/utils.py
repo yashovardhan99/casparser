@@ -1,5 +1,8 @@
 import csv
 import io
+import json
+
+from cattrs.preconf.json import make_converter
 
 from casparser.types import CASData
 
@@ -17,8 +20,9 @@ def is_close(a0, a1, tol=1.0e-4):
 
 
 def cas2json(data: CASData) -> str:
-    return data.model_dump_json(by_alias=True)
-
+    converter = make_converter()
+    data_dict = converter.unstructure(data)
+    return json.dumps(data_dict, indent=4, default=str)
 
 def cas2csv_summary(data: CASData) -> str:
     with io.StringIO() as csv_fp:

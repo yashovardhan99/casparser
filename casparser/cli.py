@@ -5,6 +5,7 @@ import sys
 from decimal import Decimal
 from typing import Union
 
+from cattrs.preconf.json import make_converter
 import click
 from rich.console import Console
 from rich.markdown import Markdown
@@ -68,7 +69,8 @@ def print_nsdl(parsed_data: NSDLCASData):
     count = 0
     err = 0
 
-    data = parsed_data.model_dump(by_alias=True)
+    converter = make_converter()
+    data = converter.unstructure(parsed_data)
     # console.print(data)
 
     summary_table = Table.grid(expand=True)
@@ -77,7 +79,7 @@ def print_nsdl(parsed_data: NSDLCASData):
     spacing = (0, 1)
     summary_table.add_row(
         Padding("Statement Period :", spacing),
-        f"[bold green]{data['statement_period']['from']}[/] To "
+        f"[bold green]{data['statement_period']['from_']}[/] To "
         f"[bold green]{data['statement_period']['to']}[/]",
     )
     summary_table.add_row(Padding("File Type :", spacing), f"[bold]{data['file_type']}[/]")
@@ -192,7 +194,9 @@ def print_summary(parsed_data: CASData, output_filename=None, include_zero_folio
     count = 0
     err = 0
 
-    data = parsed_data.model_dump(by_alias=True)
+    converter = make_converter()
+
+    data = converter.unstructure(parsed_data)
     is_summary = data["cas_type"] == CASFileType.SUMMARY.name
 
     # Print CAS header stuff
@@ -202,7 +206,7 @@ def print_summary(parsed_data: CASData, output_filename=None, include_zero_folio
     spacing = (0, 1)
     summary_table.add_row(
         Padding("Statement Period :", spacing),
-        f"[bold green]{data['statement_period']['from']}[/] To "
+        f"[bold green]{data['statement_period']['from_']}[/] To "
         f"[bold green]{data['statement_period']['to']}[/]",
     )
     summary_table.add_row(Padding("File Type :", spacing), f"[bold]{data['file_type']}[/]")
@@ -349,7 +353,8 @@ def print_gifts(cg: CapitalGainsReport):
 
 def print_gains(parsed_data: CASData, output_file_path=None, gains_112a=""):
     cg = CapitalGainsReport(parsed_data)
-    data = parsed_data.model_dump(by_alias=True)
+    converter = make_converter()
+    data = converter.unstructure(parsed_data)
     if not cg.has_gains():
         console.print("[bold yellow]Warning:[/] No capital gains info found in CAS")
         if cg.has_gifts():

@@ -1015,7 +1015,7 @@ class TestEnrichDematEquities:
                     mutual_funds=[],
                 )
             ],
-            statement_period=StatementPeriod(**{"from": "2026-01-01", "to": "2026-03-31"}),
+            statement_period=StatementPeriod(from_="2026-01-01", to="2026-03-31"),
             investor_info=InvestorInfo(name="A B", email="a@b.com", address="x", mobile="9"),
             file_type=FileType.NSDL,
         )

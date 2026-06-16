@@ -906,7 +906,7 @@ def parse(
             parse_warnings.extend(_reconcile_balances(scheme))
 
     return CASData(
-        statement_period=statement_period or StatementPeriod(**{"from": "", "to": ""}),
+        statement_period=statement_period or StatementPeriod(from_="", to=""),
         folios=list(folios.values()),
         investor_info=extract_cams_kfin_investor(pdf_path, password, _doc=_doc),
         cas_type=CASFileType.DETAILED,
